@@ -1,0 +1,39 @@
+{
+  "profile": {
+    "uuid": "GENERATE-A-UUID-HERE",
+    "metadata": {
+      "title": "HR-Sys Moderate Baseline with Privacy Overlay",
+      "last-modified": "2024-01-01T00:00:00Z",
+      "version": "1.0",
+      "oscal-version": "1.1.2"
+    },
+    "imports": [
+      {
+        "href": "content/NIST_SP-800-53_rev5_MODERATE-baseline_profile.json"
+      }
+    ],
+    "modify": {
+      "set-parameters": [
+        {
+          "param-id": "ac-2_prm_1",
+          "values": ["TODO: define account types applicable to HR-Sys"]
+        }
+      ],
+      "alters": [
+        {
+          "control-id": "pt-2",
+          "adds": [
+            {
+              "props": [
+                {
+                  "name": "rationale",
+                  "value": "TODO: Explain why PT-2 (Authority to Process PII) is emphasized for HR-Sys"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
