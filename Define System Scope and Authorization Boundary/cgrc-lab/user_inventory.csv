@@ -1,0 +1,4 @@
+UserID,Role,AccessLevel,System
+U001,Information Assurance Manager,Admin,WebApp-Server
+U002,GRC Architect,Admin,DB-Server
+U003,Researcher,Read-Only,BCI-Sensor-Gateway
