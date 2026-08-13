@@ -1,0 +1,22 @@
+SECURITY CATEGORIZATION MEMO
+
+System Name: Patient Appointment Scheduling System
+Prepared By: [Your Name], Cybersecurity Risk & Controls Analyst
+Date: [Today's Date]
+
+Information Types Identified:
+1. Scheduling Information
+2. Identity/PII Management
+
+Overall System Categorization (FIPS 199 High-Water Mark):
+- Confidentiality: [Fill in]
+- Integrity: [Fill in]
+- Availability: [Fill in]
+
+Justification Summary:
+[Summarize key reasons from your spreadsheet]
+
+Recommendation: Categorize system as [Low/Moderate/High] impact overall.
+
+Authorizing Official Signature: ____________________
+Date: ____________________
