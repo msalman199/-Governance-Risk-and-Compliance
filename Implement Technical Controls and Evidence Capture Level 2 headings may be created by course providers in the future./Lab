@@ -1,0 +1,173 @@
+Implement Technical Controls and Evidence Capture
+Objectives
+By the end of this lab, you will be able to:
+
+Deploy and configure auditd, fail2ban, and AIDE as technical controls on Ubuntu
+Implement access control (AC-2, AC-3) and audit logging (AU-2, AU-12) settings
+Validate configuration baselines using OpenSCAP
+Capture and hash evidence artifacts in a tamper-evident structure
+Build an evidence index mapping artifacts to SP 800-53 control IDs
+Prerequisites
+Basic Linux command line skills (users, permissions, systemd)
+Familiarity with SP 800-53 control families (AC, AU)
+Understanding of CGRC Domains 4 (Implementation) and 5 (Assessment)
+Comfort editing config files with nano or vim
+Environment Setup
+Al Nafi provides a single Ubuntu Linux machine via Start Lab
+Log in via the provided terminal/SSH access
+Update the system before starting:
+sudo apt update && sudo apt upgrade -y
+Task 1: Deploy Hardened Workload Components
+Install the core control tools:
+
+sudo apt install -y auditd audispd-plugins fail2ban aide aide-common
+Verify each service:
+
+sudo systemctl status auditd --no-pager
+sudo systemctl status fail2ban --no-pager
+Initialize AIDE (file integrity baseline):
+
+sudo aideinit
+# TODO: locate the generated database (usually /var/lib/aide/aide.db.new.gz)
+# TODO: promote it to the active database (aide.db.gz) so future checks work
+Checkpoint: Confirm auditd and fail2ban are active (running) before proceeding.
+
+Task 2: Configure Access Control (AC-2, AC-3)
+AC-2 (Account Management): Create a restricted service account and a controls-admin group.
+
+sudo groupadd controls-admins
+sudo useradd -m -s /bin/bash svc-audit
+# TODO: add svc-audit to controls-admins group
+# TODO: set an account expiration policy using chage (e.g., 90 days)
+AC-3 (Access Enforcement): Restrict access to sensitive directories.
+
+sudo mkdir -p /opt/evidence
+# TODO: set ownership to root:controls-admins
+# TODO: set permissions so only owner/group can read/write (no world access)
+Document your choices — you will reference these settings when building the evidence index.
+
+Task 3: Configure Audit Logging (AU-2, AU-12)
+AU-2 (Event Logging): Add audit rules for account and access changes.
+
+Edit /etc/audit/rules.d/audit.rules and add:
+
+-w /etc/passwd -p wa -k identity_changes
+-w /etc/group -p wa -k identity_changes
+-w /etc/sudoers -p wa -k privilege_escalation
+-w /opt/evidence -p wa -k evidence_access
+AU-12 (Audit Generation): Load rules and confirm generation.
+
+sudo augenrules --load
+sudo systemctl restart auditd
+# TODO: trigger a test event (e.g., sudo touch /etc/passwd.test)
+# TODO: verify it was logged using ausearch -k identity_changes
+Configure fail2ban for SSH monitoring (supports AU-2 event capture):
+
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+# TODO: edit jail.local, enable the [sshd] section, set maxretry = 5
+sudo systemctl restart fail2ban
+Task 4: Validate Baseline with OpenSCAP
+Install OpenSCAP and a SCAP content set:
+
+sudo apt install -y libopenscap8 ssg-debderived
+Locate available content:
+
+ls /usr/share/xml/scap/ssg/content/
+Run an evaluation (adjust filename to your Ubuntu version's datastream):
+
+sudo oscap xccdf eval \
+  --profile xccdf_org.ssgproject.content_profile_cis_level1_server \
+  --results /opt/evidence/scap-results.xml \
+  --report /opt/evidence/scap-report.html \
+  /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml
+Troubleshooting: If the datastream file name differs, use ls output from above. If the profile ID errors out, list profiles with:
+
+oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml
+Task 5: Capture Evidence Artifacts (Tamper-Evident Storage)
+Collect artifacts into /opt/evidence:
+
+sudo auditctl -l > /opt/evidence/audit-rules.txt
+sudo fail2ban-client status sshd > /opt/evidence/fail2ban-status.txt
+sudo aide --check > /opt/evidence/aide-check.txt 2>&1
+getent passwd > /opt/evidence/account-listing.txt
+Generate cryptographic hashes for tamper evidence:
+
+# evidence_hash.py
+import hashlib
+import os
+import json
+from datetime import datetime
+
+def hash_file(filepath: str) -> str:
+    """
+    Compute SHA-256 hash of a given file.
+
+    Args:
+        filepath: Path to the file to hash
+
+    Returns:
+        Hexadecimal SHA-256 digest as a string
+    """
+    # TODO: open file in binary mode
+    # TODO: read in chunks and update hashlib.sha256()
+    # TODO: return hex digest
+    pass
+
+def build_manifest(evidence_dir: str, output_file: str) -> dict:
+    """
+    Walk evidence_dir, hash each file, and write a JSON manifest.
+
+    Args:
+        evidence_dir: Directory containing evidence artifacts
+        output_file: Path to write the manifest JSON
+
+    Returns:
+        Dictionary of {filename: {hash, timestamp}}
+    """
+    manifest = {}
+    # TODO: iterate over files in evidence_dir (skip the manifest itself)
+    # TODO: call hash_file() for each artifact
+    # TODO: record hash + datetime.utcnow().isoformat() per file
+    # TODO: write manifest dict to output_file as JSON
+    return manifest
+
+if __name__ == "__main__":
+    build_manifest("/opt/evidence", "/opt/evidence/manifest.json")
+Run it and lock down permissions:
+
+python3 evidence_hash.py
+sudo chmod 440 /opt/evidence/*
+sudo chattr +i /opt/evidence/manifest.json   # optional: make immutable
+Task 6: Build the Evidence Index
+Create /opt/evidence/evidence-index.csv mapping artifacts to controls:
+
+control_id,control_name,artifact_file,description
+AC-2,Account Management,account-listing.txt,List of system accounts
+AC-3,Access Enforcement,# TODO,# TODO
+AU-2,Event Logging,audit-rules.txt,Active audit rules
+AU-12,Audit Generation,# TODO,# TODO
+CM-6,Configuration Settings,scap-results.xml,OpenSCAP baseline results
+SI-7,Software Integrity,aide-check.txt,AIDE file integrity check
+Complete the # TODO rows referencing the fail2ban status and manifest files.
+
+Verification
+Run these checks to confirm lab completion:
+
+# Services running
+systemctl is-active auditd fail2ban
+
+# Audit rule triggered a log entry
+sudo ausearch -k identity_changes | tail -5
+
+# Evidence directory populated and permissions locked
+ls -l /opt/evidence
+
+# Manifest contains hashes
+cat /opt/evidence/manifest.json
+
+# Evidence index complete (no TODO markers remain)
+grep -i "TODO" /opt/evidence/evidence-index.csv
+Expected outcome: all services active, at least one audit event logged, /opt/evidence contains SCAP results, text artifacts, manifest.json, and a completed evidence-index.csv with no leftover TODOs.
+
+Conclusion
+In this lab, you implemented technical controls on a Linux workload aligned to SP 800-53 (AC-2, AC-3, AU-2, AU-12), deployed auditd, fail2ban, and AIDE, and validated system configuration using OpenSCAP. You then captured evidence artifacts, generated tamper-evident SHA-256 hashes, and mapped each artifact to its corresponding control in an evidence index. These skills directly support CGRC Domain 4 (Implementation) by demonstrating control deployment, and Domain 5 (Assessment/Authorization) by producing auditable, machine-readable evidence suitable for a security assessment package.
