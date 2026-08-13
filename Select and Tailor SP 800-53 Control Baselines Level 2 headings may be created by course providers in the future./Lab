@@ -1,0 +1,167 @@
+Select and Tailor SP 800-53 Control Baselines
+Objectives
+By the end of this lab, you will be able to:
+
+Install and use the NIST OSCAL CLI on Linux
+Select the SP 800-53 moderate control baseline for a sample workload
+Tailor controls using a privacy overlay with documented rationale
+Classify controls as system-specific, hybrid, or common
+Export a tailored control baseline in OSCAL JSON format
+Prerequisites
+Familiarity with SP 800-53 control families and baseline concepts (low/moderate/high)
+Basic Linux command line skills (navigating directories, editing files)
+Understanding of CGRC Domain 3 (Selecting and Approving Security/Privacy Controls)
+No prior OSCAL experience required
+Environment Setup
+Al Nafi provides a single Linux machine via Start Lab. Use the terminal for all steps.
+
+# Update system and install Java (required for OSCAL CLI)
+sudo apt update
+sudo apt install -y openjdk-17-jre-headless unzip wget jq
+
+# Verify Java
+java -version
+Task 1: Install OSCAL CLI and Download SP 800-53B Baselines
+Download and extract the OSCAL CLI:
+cd ~
+wget https://github.com/usnistgov/oscal-cli/releases/latest/download/oscal-cli-distribution.zip
+unzip oscal-cli-distribution.zip -d oscal-cli
+export PATH=$PATH:~/oscal-cli/bin
+oscal-cli --version
+Add the PATH export to ~/.bashrc so it persists:
+echo 'export PATH=$PATH:~/oscal-cli/bin' >> ~/.bashrc
+Create a working directory and download the SP 800-53 Rev 5 catalog and baselines (OSCAL content repo):
+mkdir -p ~/oscal-lab/content && cd ~/oscal-lab/content
+
+# TODO: Download the SP 800-53 catalog JSON
+wget https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json
+
+# TODO: Download the moderate baseline profile JSON
+wget https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_MODERATE-baseline_profile.json
+Validate the downloaded files:
+oscal-cli profile validate NIST_SP-800-53_rev5_MODERATE-baseline_profile.json
+Troubleshooting: If validation fails with a schema error, confirm the file downloaded completely (ls -lh) and re-download if size is 0 or truncated.
+
+Task 2: Select the Moderate Baseline for the Example Workload
+Scenario: You are the GRC Architect for a moderate-impact HR records system ("HR-Sys") processing employee PII.
+
+Resolve the moderate profile into a flattened catalog to see all included controls:
+cd ~/oscal-lab/content
+oscal-cli profile resolve NIST_SP-800-53_rev5_MODERATE-baseline_profile.json \
+  -o ~/oscal-lab/hr-sys-resolved-catalog.json
+Inspect the resolved catalog control count:
+jq '[.catalog.groups[].controls[]?.id] | length' ~/oscal-lab/hr-sys-resolved-catalog.json
+TODO: List all controls belonging to the Access Control (AC) family using jq. Reference the OSCAL catalog schema for the correct path (hint: filter by id prefix ac-).
+Task 3: Tailor Controls Using a Privacy Overlay
+Since HR-Sys processes PII, apply a privacy-focused tailoring by creating a custom profile that imports the moderate baseline and adds/modifies controls (e.g., emphasizing PT family and SC-9-equivalent protections).
+
+Create a tailoring profile file hr-sys-privacy-profile.json:
+cd ~/oscal-lab
+touch hr-sys-privacy-profile.json
+Use this starter template — complete the TODOs:
+{
+  "profile": {
+    "uuid": "GENERATE-A-UUID-HERE",
+    "metadata": {
+      "title": "HR-Sys Moderate Baseline with Privacy Overlay",
+      "last-modified": "2024-01-01T00:00:00Z",
+      "version": "1.0",
+      "oscal-version": "1.1.2"
+    },
+    "imports": [
+      {
+        "href": "content/NIST_SP-800-53_rev5_MODERATE-baseline_profile.json"
+      }
+    ],
+    "modify": {
+      "set-parameters": [
+        {
+          "param-id": "ac-2_prm_1",
+          "values": ["TODO: define account types applicable to HR-Sys"]
+        }
+      ],
+      "alters": [
+        {
+          "control-id": "pt-2",
+          "adds": [
+            {
+              "props": [
+                {
+                  "name": "rationale",
+                  "value": "TODO: Explain why PT-2 (Authority to Process PII) is emphasized for HR-Sys"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+Generate a UUID for the profile:
+python3 -c "import uuid; print(uuid.uuid4())"
+Validate your tailored profile:
+oscal-cli profile validate hr-sys-privacy-profile.json
+Document your rationale in a separate markdown file tailoring-rationale.md:
+cat > tailoring-rationale.md << 'EOF'
+# Tailoring Rationale - HR-Sys
+
+## Control: PT-2 (Authority to Process PII)
+Rationale: TODO
+
+## Control: AC-2 (Account Management)
+Rationale: TODO
+
+## Compensating Control (if any control cannot be fully implemented)
+Control Not Implemented: TODO
+Compensating Control Applied: TODO
+Justification: TODO
+EOF
+Task 4: Designate System-Specific, Hybrid, and Common Controls
+Create a control designation worksheet control-designations.csv:
+cat > control-designations.csv << 'EOF'
+control-id,designation,justification
+ac-2,hybrid,TODO
+au-2,common,TODO
+pt-2,system-specific,TODO
+cp-9,common,TODO
+EOF
+TODO: Add at least 6 more controls from the moderate baseline (from families AC, AU, CM, IR, SC, PT) and classify each as:
+
+common — inherited from a shared service (e.g., managed by a central IT/security team)
+system-specific — implemented uniquely by HR-Sys
+hybrid — partially inherited, partially implemented locally
+Justify each designation in one sentence, referencing how HR-Sys's architecture (e.g., shared logging service, dedicated PII database) supports the classification.
+
+Task 5: Export Tailored Control Set in OSCAL JSON
+Resolve your tailored privacy profile into a final catalog for handoff:
+cd ~/oscal-lab
+oscal-cli profile resolve hr-sys-privacy-profile.json \
+  -o hr-sys-final-tailored-catalog.json
+Validate the final export:
+oscal-cli catalog validate hr-sys-final-tailored-catalog.json
+Confirm the file is well-formed JSON:
+jq . hr-sys-final-tailored-catalog.json > /dev/null && echo "Valid JSON"
+Troubleshooting: If oscal-cli profile resolve fails due to a broken href, ensure the imports.href path in your profile is relative to your current working directory or use an absolute path.
+
+Verification
+Run these checks to confirm lab completion:
+
+# 1. Confirm OSCAL CLI is installed
+oscal-cli --version
+
+# 2. Confirm baseline files exist
+ls -lh ~/oscal-lab/content/*.json
+
+# 3. Confirm tailored profile validates
+oscal-cli profile validate ~/oscal-lab/hr-sys-privacy-profile.json
+
+# 4. Confirm final export exists and is valid JSON
+jq '.catalog.metadata.title' ~/oscal-lab/hr-sys-final-tailored-catalog.json
+
+# 5. Confirm rationale and designation files exist
+ls ~/oscal-lab/tailoring-rationale.md ~/oscal-lab/control-designations.csv
+Expected outcome: All commands return valid output with no errors; hr-sys-final-tailored-catalog.json contains your tailored control title and modified parameters/controls.
+
+Conclusion
+In this lab, you installed and configured the NIST OSCAL CLI, downloaded and validated SP 800-53 Rev 5 catalog and moderate baseline content, and resolved that baseline for a sample moderate-impact HR system. You applied CGRC Domain 3 skills by tailoring the baseline with a privacy overlay, documenting rationale for parameter and control modifications, and classifying controls as system-specific, hybrid, or common based on system architecture. Finally, you exported a fully resolved, validated OSCAL JSON control set ready for handoff to implementation and assessment teams. These skills directly support real-world GRC Architect responsibilities in baseline selection, tailoring, and control inheritance documentation required for CGRC-aligned authorization packages.
