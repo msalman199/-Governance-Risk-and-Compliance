@@ -1,0 +1,5 @@
+Information Type: Scheduling Information (D.16.3 - similar reference category)
+Description: Appointment dates, times, provider assignments
+
+Information Type: Identity/PII Management
+Description: Patient name, phone number, email
