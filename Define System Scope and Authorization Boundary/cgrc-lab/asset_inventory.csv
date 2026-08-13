@@ -1,0 +1,5 @@
+AssetID,AssetName,Type,Owner,DataClassification,Location
+A001,WebApp-Server,Server,IA Manager,Confidential,On-Prem
+A002,DB-Server,Database,GRC Architect,Restricted,On-Prem
+A003,Admin-Laptop,Endpoint,IT Admin,Internal,Office
+A004,BCI-Sensor-Gateway,IoT Device,Research Team,Confidential,Lab
