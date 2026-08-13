@@ -1,0 +1,5 @@
+mapping_status,control_theme,required_evidence
+Equivalent,Policy,Approved policy document with review date
+Equivalent,Vulnerability Management,Scan reports and remediation tickets
+Equivalent,Monitoring,SIEM logs or monitoring dashboard screenshots
+Gap,Incident Management,Manual process documentation pending automation
