@@ -1,0 +1,161 @@
+Categorize System Impact Using FIPS 199 and SP 800-60
+Objectives
+By the end of this lab, you will be able to:
+
+Identify information types for a sample system using NIST SP 800-60 Volume 2
+Assign provisional Confidentiality, Integrity, and Availability (C-I-A) impact ratings using FIPS 199
+Adjust impact levels based on operational context and document justifications
+Use basic command-line and spreadsheet tools to record a security categorization
+Produce a signed categorization memo for an authorizing official (AO)
+Prerequisites
+Basic familiarity with the Linux terminal (navigating folders, running commands)
+No prior GRC experience required
+Basic understanding of confidentiality, integrity, and availability concepts (will be reviewed)
+Environment Setup
+Al Nafi provides a single Linux machine via Start Lab. All tools used are open-source and installed locally — no cloud or external accounts needed.
+
+Start your lab machine and open a terminal.
+Update packages and install required tools:
+sudo apt update
+sudo apt install -y libreoffice-calc git python3 python3-pip
+Install the OSCAL CLI tool (used to validate categorization data in OSCAL format):
+pip3 install --user oscal-cli
+# Verify install
+oscal-cli --version
+Create a working directory:
+mkdir -p ~/fips199-lab && cd ~/fips199-lab
+Scenario
+You are a Cybersecurity Risk & Controls Analyst reviewing a sample workload: a Patient Appointment Scheduling System used by a mid-size clinic network. It stores patient names, appointment times, and basic contact information (no medical diagnosis data).
+
+Tasks
+Task 1: Set Up Your Workbook
+Launch LibreOffice Calc:
+libreoffice --calc &
+Create a new spreadsheet named categorization_workbook.ods in ~/fips199-lab.
+Create these column headers in Row 1:
+A: Information Type | B: Confidentiality | C: Integrity | D: Availability | E: Justification
+Save the file.
+Task 2: Identify Information Types (SP 800-60 Vol 2)
+SP 800-60 Vol 2 provides pre-defined information types (e.g., "Patient Identity Management," "Appointment/Scheduling Information").
+
+Create a text file to record your research:
+nano information_types.txt
+List two information types relevant to the scenario. Example format:
+Information Type: Scheduling Information (D.16.3 - similar reference category)
+Description: Appointment dates, times, provider assignments
+
+Information Type: Identity/PII Management
+Description: Patient name, phone number, email
+Save and exit (Ctrl+O, Enter, Ctrl+X).
+Task 3: Assign Provisional Impact Ratings
+FIPS 199 defines impact levels as Low, Moderate, or High for C, I, and A.
+
+Reference guide (use this table while rating):
+Impact	Meaning
+Low	Limited adverse effect
+Moderate	Serious adverse effect
+High	Severe or catastrophic effect
+In your spreadsheet, fill in provisional ratings for each information type. Example starting point:
+Row 2: Scheduling Information | Low | Moderate | Moderate | (justification pending)
+Row 3: Identity/PII Management | Moderate | Moderate | Low | (justification pending)
+TODO for you to complete:
+Assign a provisional C-I-A rating for both information types listed in your information_types.txt
+Base your rating on the SP 800-60 provisional guidance (PII typically starts at Moderate confidentiality)
+Task 4: Adjust Impact Based on Operational Context
+Provisional ratings are a starting point — adjust based on real-world context.
+
+Consider these adjustment factors:
+
+Does losing availability delay urgent care? (raises Availability)
+Is data aggregated with other sensitive data? (may raise Confidentiality)
+Is the clinic subject to regional privacy law (e.g., GCC data protection regulations)?
+Update the Justification column (E) for each row explaining your adjustment. Example:
+
+E2: "Availability raised to Moderate — scheduling delays could impact patient care continuity."
+E3: "Confidentiality kept at Moderate — PII limited to contact info, no medical records stored."
+Determine the overall system categorization using the FIPS 199 high-water mark rule (highest rating across all information types wins per objective):
+# Create a small script to help calculate the high-water mark
+nano calculate_impact.py
+def high_water_mark(ratings: list) -> str:
+    """
+    Determine the overall impact level using FIPS 199 high-water mark rule.
+
+    Args:
+        ratings: List of strings, e.g. ["Low", "Moderate", "High"]
+
+    Returns:
+        The highest impact level found (as a string)
+    """
+    # Order of severity, lowest to highest
+    order = ["Low", "Moderate", "High"]
+
+    # TODO: Find the rating in 'ratings' with the highest severity
+    # Hint: use order.index() to compare severity levels
+    # TODO: Return that rating as a string
+    pass
+
+
+# TODO: Call the function separately for Confidentiality, Integrity, and Availability
+# Example:
+# c_ratings = ["Low", "Moderate"]
+# print("Overall Confidentiality:", high_water_mark(c_ratings))
+Run your script and record the results:
+python3 calculate_impact.py
+Task 5: Produce a Signed Categorization Memo
+Create the memo file:
+nano categorization_memo.txt
+Use this template (fill in your findings):
+SECURITY CATEGORIZATION MEMO
+
+System Name: Patient Appointment Scheduling System
+Prepared By: [Your Name], Cybersecurity Risk & Controls Analyst
+Date: [Today's Date]
+
+Information Types Identified:
+1. Scheduling Information
+2. Identity/PII Management
+
+Overall System Categorization (FIPS 199 High-Water Mark):
+- Confidentiality: [Fill in]
+- Integrity: [Fill in]
+- Availability: [Fill in]
+
+Justification Summary:
+[Summarize key reasons from your spreadsheet]
+
+Recommendation: Categorize system as [Low/Moderate/High] impact overall.
+
+Authorizing Official Signature: ____________________
+Date: ____________________
+Save the memo, then "sign" it digitally using a simple checksum as a stand-in for a digital signature:
+sha256sum categorization_memo.txt > categorization_memo.sig
+cat categorization_memo.sig
+This checksum acts as an integrity marker — any future edit to the memo will produce a different hash, showing tampering.
+
+Verification
+Run these checks to confirm your work is complete:
+
+# Check all required files exist
+ls -l ~/fips199-lab
+Expected files:
+
+categorization_workbook.ods
+information_types.txt
+calculate_impact.py
+categorization_memo.txt
+categorization_memo.sig
+# Confirm the memo contains your ratings (should return matching lines)
+grep -i "Confidentiality" categorization_memo.txt
+grep -i "Integrity" categorization_memo.txt
+grep -i "Availability" categorization_memo.txt
+# Verify the signature file matches the memo
+sha256sum -c categorization_memo.sig
+Expected output: categorization_memo.txt: OK
+
+Troubleshooting
+LibreOffice won't open: Run libreoffice --calc without & and check terminal for errors; ensure package installed correctly.
+oscal-cli command not found: Ensure ~/.local/bin is in your PATH: export PATH=$PATH:~/.local/bin
+sha256sum -c fails: You edited the memo after generating the signature — rerun sha256sum to regenerate it.
+Python script errors: Check indentation; Python requires consistent spacing (4 spaces recommended).
+Conclusion
+In this lab, you performed a complete FIPS 199 / SP 800-60 security categorization exercise on a sample healthcare scheduling system. You identified relevant information types, assigned and adjusted provisional C-I-A impact ratings based on operational context, calculated an overall system categorization using the high-water mark method, and produced a signed categorization memo suitable for an authorizing official's review. These skills directly support CGRC Domain 2 (Categorization) and Domain 3 (Selection) objectives and reflect real-world tasks performed by Cybersecurity Risk & Controls Analysts.
