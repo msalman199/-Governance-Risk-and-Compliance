@@ -1,0 +1,173 @@
+GCC Regulatory Mapping: NCA ECC, SAMA, NESA, ISR
+Objectives
+By completing this lab, you will:
+
+Design and implement a normalized relational schema for multi-framework regulatory control mapping
+Import and reconcile heterogeneous GCC regulator control catalogs (NCA ECC, SAMA CSF, NESA/SIA, Qatar NIA)
+Build a crosswalk engine linking GCC controls to NIST SP 800-53 Rev 5 and ISO 27001:2022
+Engineer logic to flag GCC-specific overlay requirements (data residency, Arabic-language logging, local hosting)
+Generate a queryable regional applicability matrix supporting CGRC Domain 6 (Continuous Monitoring) reporting
+Prerequisites
+Strong SQL skills (joins, CTEs, window functions)
+Working knowledge of NIST SP 800-53 and ISO 27001 control structures
+Familiarity with GRC concepts: control inheritance, overlays, compensating controls
+Python 3.10+ scripting experience (pandas, sqlite3/psycopg2)
+Understanding of CGRC Domain 6 (Compliance Monitoring and Reporting)
+Comfort working with CSV data of unknown/inconsistent schemas
+Environment Setup
+Al Nafi provides a single Linux machine via Start Lab. Provision the environment:
+
+sudo apt update && sudo apt install -y postgresql postgresql-contrib python3-pip sqlite3
+pip3 install pandas psycopg2-binary sqlalchemy openpyxl
+sudo systemctl enable --now postgresql
+sudo -u postgres createdb gcc_grc_map
+mkdir -p ~/gcc-lab/{data,scripts,output} && cd ~/gcc-lab
+You will source or construct representative control catalog CSVs for each framework (NCA ECC 2-2024, SAMA CSF v2.0, NESA/SIA, Qatar NIA v2.0) — sample small extracts (10-15 controls each) are acceptable given no single public unified dataset exists. Structure them consistently: control_id, domain, title, description, control_type.
+
+Tasks
+Task 1: Design and Populate the Normalized Control Database
+Architect a schema that avoids duplication and supports many-to-many crosswalks across frameworks.
+
+Required entities (minimum):
+
+frameworks (id, name, version, jurisdiction, authority)
+controls (id, framework_id, control_ref, domain, title, description)
+crosswalks (source_control_id, target_control_id, mapping_strength: enum[exact,partial,related], rationale)
+overlays (id, name, description, trigger_condition)
+control_overlays (control_id, overlay_id)
+Design decisions you must make and justify in comments:
+
+How do you model many-to-many crosswalks bidirectionally without duplicate rows?
+How do you version controls if a framework updates (e.g., NCA ECC 1-2018 to 2-2024)?
+How do you handle controls with no equivalent in another framework (orphan handling)?
+-- schema.sql
+-- TODO: Define frameworks table
+-- TODO: Define controls table with foreign key to frameworks
+-- TODO: Define crosswalks table with mapping_strength enum
+-- TODO: Define overlays and control_overlays junction table
+-- TODO: Add indexes on control_ref and framework_id for join performance
+Load your CSVs using a Python ETL script:
+
+# load_controls.py
+import pandas as pd
+from sqlalchemy import create_engine
+
+def load_framework_csv(csv_path: str, framework_name: str, engine) -> int:
+    """
+    Load a single regulator's control catalog CSV into the controls table.
+
+    Args:
+        csv_path: path to normalized CSV (control_id, domain, title, description, control_type)
+        framework_name: e.g. 'NCA_ECC', 'SAMA_CSF', 'NESA_SIA', 'QATAR_NIA'
+        engine: SQLAlchemy engine connected to gcc_grc_map
+
+    Returns:
+        Number of rows inserted
+    """
+    # TODO: validate CSV schema before insert
+    # TODO: upsert framework record, get framework_id
+    # TODO: bulk insert controls, handle duplicate control_ref
+    # TODO: return row count
+    pass
+
+def validate_catalog_integrity(engine) -> dict:
+    """Return counts per framework and flag any controls missing required fields."""
+    # TODO: query and validate
+    pass
+Task 2: Build the NIST 800-53 / ISO 27001 Crosswalk Engine
+Implement a mapping strategy — do not hardcode 1:1 assumptions; many GCC controls map partially or many-to-one.
+
+# crosswalk_engine.py
+from typing import Literal
+
+MappingStrength = Literal["exact", "partial", "related"]
+
+def generate_crosswalk_candidates(gcc_control_id: int, reference_framework: str, engine) -> list[dict]:
+    """
+    Use keyword/domain similarity to suggest candidate NIST 800-53 or ISO 27001
+    controls for a given GCC control. This is a decision-support function —
+    final mapping_strength assignment requires analyst judgment.
+
+    Args:
+        gcc_control_id: internal control PK
+        reference_framework: 'NIST_800_53' or 'ISO_27001'
+        engine: DB engine
+
+    Returns:
+        List of candidate matches with similarity scores
+    """
+    # TODO: implement text similarity (TF-IDF, fuzzy matching, or domain-tag overlap)
+    # TODO: rank candidates by score
+    # TODO: return top-N with confidence score
+    pass
+
+def commit_crosswalk(source_id: int, target_id: int, strength: MappingStrength,
+                      rationale: str, engine) -> None:
+    """Persist a confirmed crosswalk mapping after analyst review."""
+    # TODO: insert into crosswalks table, prevent duplicate pairs
+    pass
+Design consideration: justify your similarity approach (TF-IDF vs. fuzzy string vs. manual domain-tagging) given control descriptions are short and jargon-heavy.
+
+Task 3: Identify and Encode GCC-Specific Overlays
+GCC frameworks impose requirements with no NIST/ISO equivalent (e.g., in-country data residency, Arabic-language audit logs, national CERT reporting timelines).
+
+# overlay_detection.py
+
+def detect_overlay_requirements(control_description: str) -> list[str]:
+    """
+    Scan control text for GCC-specific overlay triggers.
+
+    Args:
+        control_description: raw control text
+
+    Returns:
+        List of matched overlay tags, e.g. ['data_residency', 'arabic_logging', 'local_incident_reporting']
+    """
+    # TODO: define keyword/regex patterns per overlay type
+    # TODO: apply to control text, return matched tags
+    pass
+
+def tag_controls_with_overlays(engine) -> int:
+    """Apply detect_overlay_requirements across all controls and populate control_overlays."""
+    # TODO: iterate controls, call detection, insert mapping rows
+    pass
+Minimum overlays to define: data_residency, arabic_logging, national_cert_reporting, local_hosting_mandate. Document trigger conditions for each in the overlays table.
+
+Task 4: Produce the Regional Applicability Matrix
+Generate a consolidated report showing, per control domain, which frameworks apply, crosswalk coverage, and overlay flags.
+
+# generate_matrix.py
+
+def build_applicability_matrix(engine, output_path: str) -> None:
+    """
+    Query all frameworks, crosswalks, and overlays to produce a pivot-style matrix:
+    rows = control domains, columns = frameworks + NIST/ISO mapping status + overlay flags.
+
+    Args:
+        engine: DB engine
+        output_path: destination for CSV/XLSX export
+
+    Returns:
+        None (writes file to output_path)
+    """
+    # TODO: write SQL joining controls, crosswalks, control_overlays
+    # TODO: pivot with pandas
+    # TODO: export to ~/gcc-lab/output/applicability_matrix.xlsx
+    pass
+Your matrix must answer: for a control domain like "Logging and Monitoring," which GCC frameworks require it, is there a NIST/ISO equivalent, and does it trigger the Arabic-logging overlay?
+
+Verification
+Run these checks on your Linux machine:
+
+psql -d gcc_grc_map -c "SELECT name, COUNT(*) FROM frameworks f JOIN controls c ON f.id=c.framework_id GROUP BY name;"
+psql -d gcc_grc_map -c "SELECT mapping_strength, COUNT(*) FROM crosswalks GROUP BY mapping_strength;"
+psql -d gcc_grc_map -c "SELECT o.name, COUNT(*) FROM control_overlays co JOIN overlays o ON co.overlay_id=o.id GROUP BY o.name;"
+ls -la ~/gcc-lab/output/applicability_matrix.xlsx
+Expected outcomes:
+
+All 4 frameworks populated with non-zero control counts
+Crosswalk table contains entries across all three mapping_strength categories
+Every overlay type has at least one tagged control
+Applicability matrix file exists and opens with correct pivot structure
+Conclusion
+In this lab, you architected a normalized multi-framework compliance database from scratch, engineered an ETL pipeline for heterogeneous GCC regulatory CSVs, and built a crosswalk engine linking Saudi NCA ECC, SAMA CSF, UAE NESA/SIA, and Qatar NIA to NIST SP 800-53 and ISO 27001. You implemented overlay-detection logic to surface GCC-specific requirements like data residency and Arabic logging, then produced a regional applicability matrix suitable for CGRC Domain 6 continuous monitoring reporting. These skills directly translate to real-world GRC platform design work for multinational compliance officers operating across GCC jurisdictions.
