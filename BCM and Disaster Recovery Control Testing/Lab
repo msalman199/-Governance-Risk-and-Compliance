@@ -1,0 +1,107 @@
+BCM and Disaster Recovery Control Testing
+Objectives
+By completing this lab, you will:
+
+Design a Business Impact Analysis (BIA) with RTO/RPO targets for a containerized workload
+Implement CP-family controls (CP-2, CP-9, CP-10) using restic and rsync for backup, replication, and failover
+Execute a tabletop exercise and a live technical failover test
+Produce CGRC Domain 4/5-aligned test documentation (test plan, results, POA&M-style deficiency log)
+Prerequisites
+Strong Linux CLI skills (systemd, cron, file permissions, networking basics)
+Familiarity with Docker/Podman, Git, and shell scripting
+Working knowledge of BCM/DR concepts: BIA, RTO, RPO, MTD, failover strategies
+Understanding of NIST SP 800-34 (Contingency Planning) and CGRC domains
+Comfort designing your own scripts from function-level specs (no copy-paste solutions provided)
+Environment Setup
+Single Linux machine (Ubuntu 22.04+) provided via Al Nafi Start Lab
+Install required tools:
+sudo apt update && sudo apt install -y docker.io restic rsync sqlite3 jq cron
+sudo systemctl enable --now docker
+docker --version && restic version && rsync --version
+Create working directory structure:
+mkdir -p ~/dr-lab/{workload,backups-primary,backups-secondary,docs,scripts}
+cd ~/dr-lab
+Task 1: Deploy Sample Workload and Author BIA
+Architecture requirement: Deploy a stateful workload (e.g., containerized SQLite/PostgreSQL app or simple file-serving app) representing a critical business process. Simulate "primary" and "secondary" sites as two directories/containers on the same host (production constraint: single VM).
+
+Steps:
+
+Build or pull a container that writes persistent data to a mounted volume (~/dr-lab/workload/data).
+Generate synthetic transactional data (script or cron job writing timestamped records every 30s).
+Author a BIA document (docs/bia.md) covering:
+Critical business process description and dependencies
+Impact categories (financial, operational, reputational, regulatory) at 1hr/4hr/24hr/72hr outage intervals
+Justified RTO and RPO values (e.g., RTO=15min, RPO=5min) with rationale
+MTD and resource requirements (staff, systems, data)
+Deliverable check: docs/bia.md must map impact ratings to RTO/RPO decisions — not just state numbers.
+
+Task 2: Configure Backup, Replication, and Failover
+Design constraints:
+
+Use restic for encrypted, deduplicated backups of workload data (local repository target simulating offsite storage)
+Use rsync for near-real-time replication to a "secondary" directory simulating a DR site
+Backup/replication cadence must satisfy your stated RPO
+Failover mechanism must satisfy your stated RTO
+Build the following components (design and implement yourself):
+
+# scripts/backup.sh
+# Requirements:
+# - Initialize restic repo (if not exists) with a password file (secure permissions 600)
+# - Perform incremental backup of workload data directory
+# - Tag snapshots with timestamp and workload name
+# - Log success/failure to scripts/backup.log
+# scripts/replicate.sh
+# Requirements:
+# - rsync workload data to backups-secondary/ using checksums, delete-after, and archive mode
+# - Must run on a schedule meeting your RPO (use cron)
+# - Capture exit codes and write structured log entry (JSON preferred) to replicate.log
+# scripts/failover.sh
+# Requirements:
+# - Stop primary workload container
+# - Point a new container instance at backups-secondary/ data path
+# - Validate service health post-start (HTTP check or DB query)
+# - Record failover start/end timestamps to compute actual RTO achieved
+Schedule backup and replication via cron based on your RPO:
+
+crontab -e
+# Add entries meeting your BIA-derived RPO interval
+Task 3: Tabletop Exercise
+Draft a tabletop scenario (docs/tabletop-scenario.md): e.g., "Primary storage volume corrupted at 14:00, discovered at 14:20."
+Convene a structured walkthrough (self-facilitated or with peers) covering:
+Detection and escalation timeline
+Roles/responsibilities (use RACI if available)
+Decision points: when to declare disaster, who authorizes failover
+Communication plan references
+Record outcomes in docs/tabletop-results.md:
+Decisions made, gaps identified, timing versus RTO/RPO targets, action items
+Task 4: Technical Failover Test
+Corrupt or delete primary workload data intentionally (simulate disaster):
+rm -rf ~/dr-lab/workload/data/*
+Execute failover.sh and time the full recovery.
+Validate:
+Data integrity (checksum comparison between last known-good backup and recovered data)
+Service availability (application responds correctly)
+Actual RTO and RPO achieved (compare against BIA targets)
+Test a restic restore path separately as a secondary recovery mechanism:
+restic -r <repo-path> restore latest --target <restore-path>
+Record raw timing data, command outputs, and screenshots/logs as evidence artifacts in docs/evidence/.
+Task 5: Documentation and CP Control Mapping
+Produce the following in docs/:
+
+test-plan.md: scope, test type (tabletop + functional failover), success criteria tied to RTO/RPO
+test-results.md: actual vs. target RTO/RPO, pass/fail per control objective
+deficiency-log.md (POA&M style): gap description, risk rating, root cause, remediation owner, target date
+bcp-updates.md: specific edits to the BCP/DRP based on findings (e.g., revised RTO, added automation step, updated contact list)
+control-mapping.md: map test activities to NIST 800-53 CP-family controls (CP-2, CP-4, CP-9, CP-10) and CGRC Domain 4 (implementation) / Domain 5 (assessment) tasks
+Verification
+Confirm lab completion by checking:
+
+ls docs/                     # bia.md, tabletop-*, test-*, deficiency-log.md, bcp-updates.md, control-mapping.md
+restic -r <repo-path> snapshots         # backup history exists
+cat scripts/replicate.log | tail -5     # replication executed on schedule
+cat docs/test-results.md | grep -i rto  # actual RTO documented and compared to target
+Verify failover container serves recovered data correctly (manual HTTP/DB check)
+Confirm cron jobs are active: crontab -l
+Confirm all documentation is internally consistent (RTO/RPO in BIA matches targets referenced in test-results.md)
+Conclusion
+In this lab, you designed and executed a full BCM/DR control testing cycle for a containerized workload on a single Linux host. You authored a BIA to derive justified RTO/RPO targets, implemented backup (restic) and replication (rsync) mechanisms satisfying those targets, and built a failover script to demonstrate recovery capability. You then validated the design through a tabletop exercise and a live technical failover test, measuring actual performance against stated objectives. Finally, you produced CGRC-aligned artifacts — test plan, results, deficiency log, and BCP updates — mapped to NIST 800-53 CP-family controls, directly supporting Domain 4 (implementation) and Domain 5 (assessment, testing, and continuous monitoring) competencies required for the CGRC certification.
