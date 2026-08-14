@@ -1,0 +1,100 @@
+Authorize the System: Build an ATO Package
+Objectives
+By completing this lab, you will be able to:
+
+Assemble a structured ATO package (SSP, SAR, POA&M, risk assessment) on Linux
+Generate a cryptographically verifiable evidence index
+Draft an executive risk summary and AO decision memo
+Simulate a formal authorization decision with recorded sign-off
+Prerequisites
+Working knowledge of NIST RMF / CGRC Domain 6 (Authorize) concepts
+Familiarity with Linux CLI, bash scripting, and text-based document formats (Markdown/YAML)
+Understanding of SSP, SAR, POA&M artifact purposes
+Basic Python 3 scripting ability
+Environment Setup
+Al Nafi-provided single Linux machine (Ubuntu 22.04+ assumed)
+Install required tools:
+sudo apt update
+sudo apt install -y python3 python3-pip pandoc tree gnupg jq
+pip3 install pyyaml python-docx
+Create working directory structure:
+mkdir -p ~/ato-package/{ssp,sar,poam,risk-assessment,evidence,briefing,decision}
+cd ~/ato-package
+Tasks
+Task 1: Organize Core ATO Artifacts
+Design and populate the four core artifacts as structured Markdown/YAML files. You determine schema and content depth appropriate to a fictitious "example workload" (e.g., a mid-tier web application processing sensitive data).
+
+Requirements:
+
+ssp/system-security-plan.md — system boundary, control implementation summary (pick 8–10 NIST 800-53 controls minimum), data flow
+sar/security-assessment-report.md — findings mapped to controls, pass/fail/partial status, risk ratings
+poam/poam.csv — weaknesses, milestones, resource estimates, target completion dates (columns: id,weakness,control,severity,status,milestone,due_date)
+risk-assessment/risk-assessment.md — threat sources, likelihood/impact matrix, residual risk determination
+Write a validation script that checks all four artifacts exist and are non-empty, and that POA&M CSV has required columns:
+
+# validate_artifacts.py
+import csv, os
+from pathlib import Path
+
+REQUIRED_POAM_COLUMNS = ["id", "weakness", "control", "severity", "status", "milestone", "due_date"]
+
+def validate_package(base_dir: str) -> dict:
+    """
+    Validate presence and structure of SSP, SAR, POA&M, and risk assessment.
+
+    Args:
+        base_dir: root of ato-package directory
+
+    Returns:
+        dict with keys: artifact_name -> bool (valid/invalid), plus 'errors' list
+    """
+    # TODO: check file existence for ssp, sar, risk-assessment (non-empty .md)
+    # TODO: parse poam.csv and verify REQUIRED_POAM_COLUMNS present
+    # TODO: return structured result dict
+    pass
+
+if __name__ == "__main__":
+    result = validate_package(".")
+    print(result)
+Task 2: Draft Executive Risk Summary
+Create briefing/executive-risk-summary.md
+Must synthesize SAR findings + POA&M status into a 1-page summary for a non-technical Authorizing Official (AO)
+Include: overall risk posture (High/Moderate/Low), top 3 residual risks, POA&M closure timeline, recommendation (Authorize / Authorize with Conditions / Deny)
+Constraint: no more than 400 words, no raw control IDs — translate technical findings into business risk language
+Task 3: Compile Evidence Index with Integrity Hashing
+Build a script that indexes every file in the package and computes SHA-256 hashes for tamper evidence, mirroring evidence chain-of-custody practices.
+
+# build_evidence_index.py
+import hashlib
+import json
+from pathlib import Path
+from datetime import datetime, timezone
+
+def compute_sha256(filepath: str) -> str:
+    """Return hex SHA-256 digest of a file."""
+    # TODO: implement chunked file read + hashlib.sha256 update
+    pass
+
+def build_index(base_dir: str, output_path: str) -> None:
+    """
+    Walk base_dir, hash every artifact, and write a JSON evidence index.
+
+    Each entry should include: relative_path, sha256, size_bytes, indexed_at (UTC ISO8601)
+    Exclude the output index file and any .git directories.
+    """
+    # TODO: walk directory tree with pathlib
+    # TODO: build list of entries using compute_sha256
+    # TODO: write JSON to output_path
+    pass
+
+if __name__ == "__main__":
+    build_index(".", "evidence/evidence-index.json")
+Verify integrity later with a companion verify_evidence_index.py that re-hashes files and flags mismatches (design this yourself — same CLI pattern).
+Sign the final index for non-repudiation:
+gpg --generate-key   # if no key exists; use lab defaults
+gpg --output evidence/evidence-index.json.sig --detach-sign evidence/evidence-index.json
+Task 4: Prepare AO Briefing Slides and Decision Memo
+Convert the executive summary into slides using Pandoc (no GUI tools required):
+pandoc briefing/executive-risk-summary.md -t revealjs -s -o briefing/ao-briefing.html \
+  -V revealjs-url=https://unpkg.com/reveal.js@4/
+Draft decision/decision-memo.md containing: system name, authorization boundary, risk summary reference, POA&M reference, recommended authorization type (Full ATO / Interim ATO / Denial), and a signature block placeholder for the AO
