@@ -1,0 +1,209 @@
+Build a Plan of Action and Milestones (POA&M)
+Objectives
+By the end of this lab, you will be able to:
+
+Deploy a lightweight ticketing system to track remediation findings
+Convert Security Assessment Report (SAR) findings into structured, trackable tickets
+Assign ownership, severity, milestones, and target close dates to findings
+Document risk acceptance decisions and residual risk levels
+Export a POA&M report in OSCAL-compliant JSON format
+Prerequisites
+Basic Linux command-line familiarity (package management, file editing)
+Understanding of vulnerability/finding severity ratings (Critical/High/Medium/Low)
+Conceptual knowledge of NIST RMF (Domain 5: Authorization, Domain 7: Continuous Monitoring)
+No prior Redmine or OSCAL experience required
+Environment Setup
+Al Nafi provides a single Linux machine (Ubuntu 22.04) via Start Lab. All work is done locally — no external cloud accounts needed.
+
+sudo apt update
+sudo apt install -y ruby-full ruby-dev build-essential libmysqlclient-dev \
+    sqlite3 libsqlite3-dev python3 python3-pip jq
+
+sudo gem install bundler
+Task 1: Install and Configure Redmine (Lightweight Ticketing)
+Download and extract Redmine:
+cd /opt
+sudo wget https://www.redmine.org/releases/redmine-5.1.1.tar.gz
+sudo tar -xzf redmine-5.1.1.tar.gz
+sudo mv redmine-5.1.1 redmine
+cd redmine
+Configure SQLite database (simplest option for single-machine lab):
+sudo tee config/database.yml <<EOF
+production:
+  adapter: sqlite3
+  database: db/redmine.sqlite3
+EOF
+Install dependencies and initialize:
+sudo bundle install --without development test
+sudo bundle exec rake generate_secret_token
+RAILS_ENV=production sudo bundle exec rake db:migrate
+Start Redmine on port 3000:
+sudo bundle exec rails server webrick -e production -p 3000 -d
+Verify: Open a browser to http://<lab-machine-ip>:3000. Login with default admin/admin.
+Troubleshooting: If bundle install fails on gem versions, run sudo gem update --system first.
+
+Task 2: Import SAR Findings as Structured Tickets
+Create a sample SAR findings file (simulating assessor output):
+mkdir -p ~/poam-lab && cd ~/poam-lab
+cat > sar_findings.json <<'EOF'
+[
+  {"id": "F-001", "title": "Unpatched OpenSSL vulnerability", "severity": "High", "control": "SI-2"},
+  {"id": "F-002", "title": "Weak password policy enforcement", "severity": "Medium", "control": "IA-5"},
+  {"id": "F-003", "title": "Missing audit log review", "severity": "Low", "control": "AU-6"}
+]
+EOF
+Create a Python script to push findings into Redmine via its REST API. First, generate an API key in Redmine (My Account > API access key).
+
+Complete the script template below:
+
+import json
+import requests
+
+REDMINE_URL = "http://localhost:3000"
+API_KEY = "YOUR_API_KEY_HERE"
+PROJECT_ID = "poam-project"  # create this project in Redmine UI first
+
+def load_findings(filepath: str) -> list:
+    """
+    Load SAR findings from a JSON file.
+
+    Args:
+        filepath: Path to sar_findings.json
+
+    Returns:
+        List of finding dictionaries
+    """
+    # TODO: Open file, parse JSON, return list
+    pass
+
+def create_ticket(finding: dict) -> dict:
+    """
+    Create a Redmine issue from a single finding.
+
+    Args:
+        finding: dict with keys id, title, severity, control
+
+    Returns:
+        JSON response from Redmine API
+    """
+    headers = {"X-Redmine-API-Key": API_KEY, "Content-Type": "application/json"}
+    payload = {
+        "issue": {
+            "project_id": PROJECT_ID,
+            "subject": f"{finding['id']}: {finding['title']}",
+            "description": f"Control: {finding['control']}\nSeverity: {finding['severity']}",
+            # TODO: Map severity to Redmine priority_id (e.g., 1=Low, 2=Normal, 3=High, 4=Urgent)
+        }
+    }
+    # TODO: POST to f"{REDMINE_URL}/issues.json", return response.json()
+    pass
+
+if __name__ == "__main__":
+    findings = load_findings("sar_findings.json")
+    for f in findings:
+        result = create_ticket(f)
+        print(f"Created ticket for {f['id']}")
+Run the script and verify tickets appear in the Redmine project UI:
+python3 import_findings.py
+Task 3: Assign Owners, Milestones, Severity, and Target Dates
+In the Redmine UI, open each imported ticket.
+
+For each ticket, set:
+
+Assignee: a designated owner (create sample users under Administration > Users)
+Target version/Milestone: create milestones like "Q1-Remediation", "Q2-Remediation"
+Priority: already mapped from severity in Task 2
+Due date: set based on severity (suggested SLA: High = 30 days, Medium = 60 days, Low = 90 days)
+Use the Redmine REST API to bulk-update due dates. Complete this snippet:
+
+def update_ticket_dates(issue_id: int, due_date: str, assigned_to_id: int) -> None:
+    """
+    Update an existing Redmine issue with due date and assignee.
+
+    Args:
+        issue_id: Redmine issue ID
+        due_date: Date string in YYYY-MM-DD format
+        assigned_to_id: Redmine user ID
+    """
+    # TODO: Build PUT request to f"{REDMINE_URL}/issues/{issue_id}.json"
+    # TODO: Include due_date and assigned_to_id in the issue payload
+    # TODO: Send request with requests.put()
+    pass
+Task 4: Track Risk Acceptance and Residual Risk
+Add a custom field in Redmine (Administration > Custom Fields > Issues) named Risk_Decision with values: Remediate, Risk Accepted, Transferred.
+Add a second custom field Residual_Risk (text field) to record the risk level remaining after mitigation.
+For finding F-003 (Low severity), set:
+Risk_Decision = "Risk Accepted"
+Residual_Risk = "Low - accepted by ISSO, review in 12 months"
+Document this decision rationale in the ticket's notes/journal field.
+Troubleshooting: Custom fields must be enabled per-tracker (Administration > Trackers > Bug > check Risk_Decision/Residual_Risk).
+
+Task 5: Export POA&M in OSCAL Format
+Retrieve all tickets via the API and transform them into OSCAL POA&M structure. Complete the script:
+def fetch_all_issues(project_id: str) -> list:
+    """
+    Fetch all issues for the POA&M project from Redmine.
+
+    Args:
+        project_id: Redmine project identifier
+
+    Returns:
+        List of issue dictionaries from API response
+    """
+    # TODO: GET f"{REDMINE_URL}/issues.json?project_id={project_id}"
+    # TODO: Return the 'issues' list from response JSON
+    pass
+
+def build_oscal_poam(issues: list) -> dict:
+    """
+    Convert Redmine issues into a minimal OSCAL POA&M JSON structure.
+
+    Args:
+        issues: List of issue dicts from Redmine
+
+    Returns:
+        Dictionary matching OSCAL plan-of-action-and-milestones schema (simplified)
+    """
+    poam_items = []
+    for issue in issues:
+        # TODO: Map each issue to an OSCAL poam-item:
+        #   uuid, title, description, status (open/closed),
+        #   remediation-tracking (due date), risk (severity)
+        pass
+
+    oscal_doc = {
+        "plan-of-action-and-milestones": {
+            "uuid": "GENERATE-A-UUID-HERE",
+            "metadata": {"title": "Sample POA&M", "version": "1.0"},
+            "poam-items": poam_items
+        }
+    }
+    return oscal_doc
+
+if __name__ == "__main__":
+    issues = fetch_all_issues("poam-project")
+    oscal_output = build_oscal_poam(issues)
+    with open("poam_export.json", "w") as f:
+        json.dump(oscal_output, f, indent=2)
+    print("OSCAL POA&M exported to poam_export.json")
+Validate the JSON structure:
+jq . poam_export.json | head -30
+Verification
+Confirm lab completion by checking:
+
+# 1. Redmine is running
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
+
+# 2. All 3 findings exist as tickets
+curl -s -H "X-Redmine-API-Key: $API_KEY" \
+  "http://localhost:3000/issues.json?project_id=poam-project" | jq '.issues | length'
+
+# 3. OSCAL export file exists and is valid JSON
+jq empty poam_export.json && echo "Valid JSON"
+
+# 4. Confirm risk acceptance field is present
+jq '.["plan-of-action-and-milestones"].["poam-items"][] | select(.title | contains("F-003"))' poam_export.json
+Expected results: HTTP 200, 3 issues returned, valid JSON confirmation, and F-003 entry showing risk acceptance data.
+
+Conclusion
+In this lab, you built an end-to-end POA&M tracking workflow using open-source tools on a single Linux machine. You deployed Redmine as a lightweight ticketing system, imported SAR findings as structured tickets via the REST API, assigned ownership/milestones/severity/due dates, documented risk acceptance and residual risk using custom fields, and exported the tracked findings into an OSCAL-compliant POA&M JSON file. This workflow directly supports CGRC Domain 5 (Authorization) and Domain 7 (Continuous Monitoring) by demonstrating how assessed findings are operationally tracked from identification through remediation or formal risk acceptance.
