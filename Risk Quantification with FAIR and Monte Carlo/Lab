@@ -1,0 +1,122 @@
+Risk Quantification with FAIR and Monte Carlo
+Objectives
+By completing this lab, you will:
+
+Set up an open-source FAIR risk quantification stack on Linux
+Decompose a real risk scenario using FAIR taxonomy (LEF, LM, TC, Vuln, PLM/SLM)
+Model uncertainty using Monte Carlo simulation with appropriate probability distributions
+Generate and interpret Loss Exceedance Curves (LEC)
+Produce an executive-ready quantitative risk report mapped to CGRC risk communication requirements
+Prerequisites
+Working knowledge of Python (functions, classes, numpy/pandas)
+Understanding of FAIR taxonomy (Loss Event Frequency, Loss Magnitude, Threat Capability, Control Strength)
+Familiarity with probability distributions (PERT, lognormal, triangular)
+Basic Linux CLI competency
+Conceptual grasp of CGRC risk assessment/reporting domains
+Environment Setup
+Single Linux machine (Ubuntu 22.04+) provided via Start Lab.
+
+sudo apt update && sudo apt install -y python3-pip python3-venv git
+python3 -m venv fair-env
+source fair-env/bin/activate
+pip install --upgrade pip
+pip install jupyterlab numpy pandas matplotlib scipy pyfair
+Validate: python3 -c "import pyfair; print(pyfair.__version__)"
+Launch: jupyter lab --no-browser --ip=0.0.0.0 --port=8888
+If pyfair is unavailable/outdated, you may implement FAIR factors natively with numpy/scipy distributions — this is an acceptable and encouraged architectural decision for this lab.
+Tasks
+Task 1: Scenario Decomposition (Architecture Phase)
+Select this risk scenario: "Unauthorized access to a cloud-hosted patient records database due to compromised third-party vendor credentials."
+
+Decompose it into FAIR factors. Document your reasoning in a markdown cell in Jupyter:
+
+Loss Event Frequency (LEF) = Threat Event Frequency (TEF) x Vulnerability
+Vulnerability = f(Threat Capability, Control/Resistance Strength)
+Loss Magnitude (LM) = Primary Loss + Secondary Loss
+Primary: incident response, legal, system recovery
+Secondary: regulatory fines (consider GCC data protection frameworks, e.g., PDPL/UAE, SAMA/KSA), reputational damage, customer attrition
+Deliverable: a factor table (CSV or dict) with min/most-likely/max estimates for each node, justified with assumptions (calibrated estimation, not guesses).
+
+Task 2: Distribution Design
+Design your own distribution mapping — no single correct answer. Consider:
+
+TEF: Poisson or lognormal (annual event count)
+Threat Capability & Control Strength: PERT or Beta (bounded 0-100 percentile)
+Primary/Secondary Loss Magnitude: PERT or lognormal (right-skewed, bounded by minimum recovery cost)
+Secondary Loss Event Frequency (SLEF): conditional probability, not always 100%
+Implement a reusable module:
+
+from dataclasses import dataclass
+from typing import Callable
+import numpy as np
+
+@dataclass
+class FairNode:
+    name: str
+    dist_type: str          # "pert", "lognormal", "poisson", etc.
+    params: dict             # e.g., {"min": .., "mode": .., "max": ..}
+
+    def sample(self, n: int) -> np.ndarray:
+        """
+        Generate n Monte Carlo samples for this node.
+        Must implement the sampling logic per dist_type.
+        """
+        # TODO: implement distribution sampling (use scipy.stats or custom PERT)
+        raise NotImplementedError
+
+
+def build_risk_model(nodes: dict[str, FairNode]) -> Callable[[int], np.ndarray]:
+    """
+    Compose LEF and LM nodes into a full risk function.
+    Returns a callable that produces n samples of Annualized Loss Exposure (ALE).
+    """
+    # TODO: combine TEF, Vulnerability -> LEF
+    # TODO: combine Primary + Secondary Loss -> LM
+    # TODO: ALE = LEF * LM (per iteration, vectorized)
+    raise NotImplementedError
+Note on PERT: implement using the Beta distribution reparameterization (mean-shift formula) since scipy.stats has no native PERT — this is an expected research/implementation task.
+
+Task 3: Monte Carlo Simulation & Loss Exceedance Curve
+Run 10,000-100,000 iterations. Requirements:
+
+Vectorize simulation (no Python loops over iterations)
+Compute the Annualized Loss Exposure (ALE) distribution
+Derive percentiles: P10, P50 (median), P90, P95, VaR-style tail metrics
+Plot a Loss Exceedance Curve: X-axis = Loss ($), Y-axis = Probability of exceeding that loss
+def run_simulation(model, iterations: int = 50000) -> np.ndarray:
+    """Return array of ALE samples."""
+    # TODO
+    pass
+
+def plot_loss_exceedance_curve(ale_samples: np.ndarray, save_path: str) -> None:
+    """
+    Sort samples descending, compute exceedance probability for each,
+    and plot/save the LEC.
+    """
+    # TODO
+    pass
+Edge cases to handle:
+
+Negative or non-physical sampled values (clip/reject)
+Heavy right-tail outliers skewing mean (report median + percentiles, not just mean)
+Sensitivity: re-run with Control Strength improved by 20% and compare curves (control ROI analysis)
+Task 4: Board-Ready Report
+Produce a risk_report.md or PDF (use matplotlib/pandoc if available) containing:
+
+Executive summary (2-3 sentences, non-technical, dollar-denominated)
+Scenario description and FAIR factor table
+LEC chart with annotated P90/P95 loss values
+Comparison chart: baseline vs. improved-control scenario
+Recommendation tied to CGRC risk treatment options (accept/mitigate/transfer/avoid) with cost-benefit justification
+Assumptions and limitations section (calibration confidence, data quality caveats)
+Verification
+On your Linux machine, confirm:
+
+ls *.ipynb risk_report.md loss_exceedance_curve.png
+python3 -c "import numpy as np; a=np.load('ale_samples.npy'); print(a.mean(), np.percentile(a,[50,90,95]))"
+Notebook runs end-to-end without errors (jupyter nbconvert --execute --to notebook)
+LEC plot shows a monotonically decreasing exceedance curve
+Report includes at least one quantified financial figure (e.g., "95% chance annual loss stays below $X")
+Sensitivity comparison demonstrates measurable risk reduction from control improvement
+Conclusion
+In this lab, you architected and implemented a full FAIR-based quantitative risk analysis pipeline on a single Linux machine using open-source tools. You decomposed a realistic third-party/cloud data breach scenario into FAIR taxonomy factors, designed and implemented probability distributions for uncertain inputs, built a vectorized Monte Carlo engine to compute Annualized Loss Exposure, and visualized results via a Loss Exceedance Curve. Finally, you translated statistical output into a board-ready report with actionable risk treatment recommendations — directly applicable to the CGRC domains of risk assessment, monitoring, and reporting, and to real-world enterprise risk management decision-making.
